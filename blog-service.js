@@ -27,7 +27,7 @@ function initialize() {
 function getPublishedPosts() {
     return new Promise((resolve, reject) => {
         let publishedPosts = [];
-        posts.eachPost((post) => {
+        posts.forEach((post) => {
             if (post.published === true) {
                 publishedPosts.push(post);
             }
@@ -68,6 +68,8 @@ function addPost(postData) {
             postData.published = true;
         }
     postData.id = posts.length + 1; 
+    posts.push(postData);
+    resolve(postData);
     })
 }
 
@@ -126,4 +128,4 @@ function addPost(postData) {
     })
     
 }
-module.exports = { initialize, getPostByID,getPostsByCategory, getPostsByMinDate, getPublishedPosts, getAllPosts, getCategories, addPost };
+module.exports = { initialize, getPostById,getPostsByCategory, getPostsByMinDate, getPublishedPosts, getAllPosts, getCategories, addPost };
