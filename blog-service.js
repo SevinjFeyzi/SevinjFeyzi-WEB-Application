@@ -13,7 +13,8 @@ function initialize() {
               reject("Unable to read posts file");
             }
             posts = JSON.parse(data);
-            fs.readFile(path.join(__dirname, "data", "categories.json"), 'utf8', (err, data) => {
+
+     fs.readFile(path.join(__dirname, "data", "categories.json"), 'utf8', (err, data) => {
                 if (err) {
                   reject("Unable to read categories file");
                 }
@@ -59,4 +60,70 @@ function getCategories() {
     })
 }
 
-module.exports = { initialize, getPublishedPosts, getAllPosts, getCategories };
+function addPost(postData) {
+    return new Promise((resolve, reject) => {
+        if (postData.published === undefined) {
+            postData.published = false;
+        } else {
+            postData.published = true;
+        }
+    postData.id = posts.length + 1; 
+    })
+}
+
+function getPostById(id) {
+    return new Promise((resolve, reject) => {
+        const somePosts = posts.some(post => post.id == id);
+        const onePost = somePosts[0];
+        try {
+            if (onePost) {
+                resolve(onePost);
+            }
+            else {
+                throw new Error("no result returned");
+            }
+        }
+        catch(error) {reject(error);
+        }
+    });
+}
+function getPostsByCategory(category) {
+    return new Promise((resolve, reject) => {
+        const somePosts = posts.some(post => post.category == category);
+
+        if (
+            somePosts.length > 0) {
+            resolve(somePosts);
+        } else {
+            throw new Error("no results returned");
+         
+        }
+    })
+}
+function getPostsByMinDate(minDate) {
+    return new Promise((resolve, reject) => {
+        const somePosts = posts.some(post => new Date(post.postDate) >= new Date(minDate));
+
+        if (somePosts.length > 0) {
+            resolve(somePosts);
+        } else {
+            throw new Error("no results returned");
+        }
+    })
+}
+function addPost(postData) {
+    return new Promise((resolve, reject) => {
+        if (postData.published === undefined) {
+            postData.published = false;
+        } else {
+            postData.published = true;
+        }
+    
+        postData.id = posts.length + 1;
+    
+        posts.push(postData);
+        resolve(postData);
+    })
+    
+}
+module.exports = { initialize, getPostByID,getPostsByCategory, getPostsByMinDate, getPublishedPosts, getAllPosts, getCategories, addPost };
