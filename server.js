@@ -1,35 +1,82 @@
-/*************************************************************************************
-*  WEB322 – Assignment 03
+/***********************************************************************  WEB322 â€“ Assignment 04
 *  I declare that this assignment is my own work in accordance with Seneca  Academic Policy.  No part *  of this assignment has been copied manually or electronically from any other source 
 *  (including 3rd party web sites) or distributed to other students.
 * 
 *  Name: Sevinj Feyziyeva 
 Student ID: 154057194 
-Date: Feb-00-23
+Date: Mar-10-23
 *
-*  Online (Cyclic) Link: ________________________________________________________
-************************************************************************************/
+*  Online (Cyclic) Link: `https://light-jade-cuttlefish.cyclic.app`
+*
+********************************************************************************/
+const express = require("express");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const streamifier = require("streamifier");
-const express = require("express");
+const exphbs = require("express-handlebars");
 const path = require("path");
-const upload = multer();
+const stripJs = require("strip-js");
+const blogData = require("./blog-service.js");
 const {
   initialize,
-  getPublishedPosts,
   getAllPosts,
   getCategories,
   addPost,
-  getPostByID,
-  getPostByCategory,
+  getPostById,
+  getPostsByCategory,
   getPostsByMinDate,
 } = require("./blog-service.js");
 
-const HTTP_PORT = process.env.PORT || 8080;
-
 const app = express();
+
 app.use(express.static("public"));
+
+app.use(function (req, res, next) {
+  let route = req.path.substring(1);
+  app.locals.activeRoute =
+    "/" +
+    (isNaN(route.split("/")[1])
+      ? route.replace(/\/(?!.*)/, "")
+      : route.replace(/\/(.*)/, ""));
+  app.locals.viewingCategory = req.query.category;
+  next();
+});
+
+app.engine(
+  ".hbs",
+  exphbs.engine({
+    extname: ".hbs",
+
+    helpers: {
+      navLink: function (url, options) {
+        return (
+          "<li" +
+          (url == app.locals.activeRoute ? ' class="active" ' : "") +
+          '><a href="' +
+          url +
+          '">' +
+          options.fn(this) +
+          "</a></li>"
+        );
+      },
+
+      equal: function (lvalue, rvalue, options) {
+        if (arguments.length < 3)
+          throw new Error("Handlebars Helper equal needs 2 parameters");
+        if (lvalue != rvalue) {
+          return options.inverse(this);
+        } else {
+          return options.fn(this);
+        }
+      },
+      safeHTML: function (context) {
+        return stripJs(context);
+      },
+    },
+  })
+);
+app.set("view engine", ".hbs");
+
 cloudinary.config({
   cloud_name: "kodacloud",
   api_key: "795546542562831",
@@ -37,103 +84,83 @@ cloudinary.config({
   secure: true,
 });
 
+const upload = multer();
+
+// Configuring the port
+const HTTP_PORT = process.env.PORT || 8080;
+
 app.get("/", (req, res) => {
-  res.redirect("/about");
+  res.redirect("/blog");
 });
 
 app.get("/about", (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "about.html"));
+  res.render("about");
+});
+
+app.get("/blog", async (req, res) => {
+  let viewData = {};
+  try {
+    let posts = [];
+
+    if (req.query.category) {
+      posts = await blogData.getPublishedPostsByCategory(req.query.category);
+    } else {
+      posts = await blogData.getPublishedPosts();
+    }
+
+    posts.sort((a, b) => new Date(b.postDate) - new Date(a.postDate));
+
+    let post = posts[0];
+
+    viewData.posts = posts;
+    viewData.post = post;
+  } catch (err) {
+    viewData.message = "no results";
+  }
+  try {
+    let categories = await blogData.getCategories();
+
+    viewData.categories = categories;
+  } catch (err) {
+    viewData.categoriesMessage = "no results";
+  }
+
+  res.render("blog", { data: viewData });
 });
 
 app.get("/posts", (req, res) => {
-  getAllPosts()
-    .then((data) => {
-      res.send(data);
-    })
-    .catch((err) => {
-      res.send(err);
-    });
-});
-
-app.get("/post", (req, res) => {
   if (req.query.category) {
     getPostsByCategory(req.query.category)
       .then((data) => {
-        res.send(data);
+        res.render("posts", { posts: data });
       })
+
       .catch((err) => {
-        res.send(err);
+        res.render("posts", { message: "no results" });
       });
   } else if (req.query.minDate) {
     getPostsByMinDate(req.query.minDate)
       .then((data) => {
-        res.send(data);
+        res.render("posts", { posts: data });
       })
+
       .catch((err) => {
-        res.send(err);
+        res.render("posts", { message: "no results" });
       });
   } else {
     getAllPosts()
       .then((data) => {
-        res.send(data);
+        res.render("posts", { posts: data });
       })
-      .catch((err) => {
-        res.send(err);
-      });
-  }
-});
 
-app.get("/blog", (req, res) => {
-  getPublishedPosts()
-    .then((data) => {
-      res.send(data);
-    })
-    .catch((err) => {
-      res.send(err);
-    });
-});
-
-app.get("/categories", (req, res) => {
-  getCategories()
-    .then((data) => {
-      res.send(data);
-    })
-
-    .catch((err) => {
-      res.send(err);
-    });
-});
-
-app.get("/posts", (req, res) => {
-  if (req.query.category) {
-    getPostsByCategory(req.query.category)
-      .then((data) => {
-        res.send(data);
-      })
       .catch((err) => {
-        res.send(err);
-      });
-  } else if (req.query.mindate) {
-    getPostsByMinDate(req.query.mindate)
-      .then((data) => {
-        res.send(data);
-      })
-      .catch((err) => {
-        res.send(err);
-      });
-  } else {
-    getAllPosts()
-      .then((data) => {
-        res.send(data);
-      })
-      .catch((err) => {
-        res.send(err);
+        res.render("posts", { message: "no results" });
       });
   }
 });
 
 app.get("/posts/add", (req, res) => {
-  res.sendFile(path.join(__dirname, "views", "addPost.html"));
+  res.render("addPost");
 });
 
 app.post("/posts/add", upload.single("featureImage"), (req, res) => {
@@ -146,13 +173,14 @@ app.post("/posts/add", upload.single("featureImage"), (req, res) => {
           reject(error);
         }
       });
+
       streamifier.createReadStream(req.file.buffer).pipe(stream);
     });
   };
+
   async function upload(req) {
     let result = await streamUpload(req);
     return result;
-    // console.log(result);
   }
 
   upload(req)
@@ -160,49 +188,83 @@ app.post("/posts/add", upload.single("featureImage"), (req, res) => {
       req.body.featureImage = uploaded.url;
       let postObject = {};
 
-      postObject.postDate = Date.now();
-      postObject.category = req.body.category;
-      postObject.featureImage = req.body.featureImage;
       postObject.body = req.body.body;
       postObject.title = req.body.title;
+      postObject.postDate = new Date().toISOString().slice(0, 10);
+      postObject.category = req.body.category;
+      postObject.featureImage = req.body.featureImage;
       postObject.published = req.body.published;
-
-      console.log(postObject);
 
       if (postObject.title) {
         addPost(postObject);
       }
       res.redirect("/posts");
     })
+
     .catch((err) => {
       res.send(err);
     });
 });
+
 app.get("/post/:value", (req, res) => {
   getPostById(req.params.value)
     .then((data) => {
       res.send(data);
     })
+
     .catch((err) => {
       res.send(err);
     });
 });
+
 app.get("/categories", (req, res) => {
   getCategories()
     .then((data) => {
-      res.send(data);
+      res.render("categories", { categories: data });
     })
+
     .catch((err) => {
-      res.send(err);
+      res.render("categories", { message: "no results" });
     });
 });
 
-// Using app.use towards the end to ensure all the other routes are taken care of
-app.use((req, res) => {
-  res.status(404).sendFile(path.join(__dirname, "views", "notFoundPage.html"));
+app.get("/blog/:id", async (req, res) => {
+  let viewData = {};
+  try {
+    let posts = [];
+
+    if (req.query.category) {
+      posts = await blogData.getPublishedPostsByCategory(req.query.category);
+    } else {
+      posts = await blogData.getPublishedPosts();
+    }
+
+    posts.sort((a, b) => new Date(b.postDate) - new Date(a.postDate));
+
+    viewData.posts = posts;
+  } catch (err) {
+    viewData.message = "no results";
+  }
+  try {
+    viewData.post = await blogData.getPostById(req.params.id);
+  } catch (err) {
+    viewData.message = "no results";
+  }
+  try {
+    let categories = await blogData.getCategories();
+
+    viewData.categories = categories;
+  } catch (err) {
+    viewData.categoriesMessage = "no results";
+  }
+
+  res.render("blog", { data: viewData });
 });
 
-// Listening at the end after everything is initialized
+app.use((req, res) => {
+  res.status(404).render("404");
+});
+
 initialize().then(() => {
   app.listen(HTTP_PORT, () => {
     console.log("Express http server listening on: " + HTTP_PORT);
