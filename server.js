@@ -4,9 +4,9 @@
 * 
 *  Name: Sevinj Feyziyeva 
 Student ID: 154057194 
-Date: Mar-10-23
+Date: Mar-21-23
 *
-*  Online (Cyclic) Link: 
+*  Online (Cyclic) Link: https://wild-slippers-yak.cyclic.app/categories
 *
 ********************************************************************************/
 const express = require("express");
