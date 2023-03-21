@@ -1,4 +1,4 @@
-/***********************************************************************  WEB322 â€“ Assignment 04
+/***********************************************************************  WEB322 â€“ Assignment 05
 *  I declare that this assignment is my own work in accordance with Seneca  Academic Policy.  No part *  of this assignment has been copied manually or electronically from any other source 
 *  (including 3rd party web sites) or distributed to other students.
 * 
@@ -6,7 +6,7 @@
 Student ID: 154057194 
 Date: Mar-10-23
 *
-*  Online (Cyclic) Link: `https://wild-slippers-yak.cyclic.app`
+*  Online (Cyclic) Link: 
 *
 ********************************************************************************/
 const express = require("express");
@@ -23,9 +23,13 @@ const {
   getCategories,
   addPost,
   getPostById,
-  getPostsByCategory,
   getPostsByMinDate,
+  getPublishedPostsByCategory,
+  addCategory,
+  deletePostById,
+  deleteCategoryById,
 } = require("./blog-service.js");
+const { resolve } = require("path");
 
 const app = express();
 
@@ -41,6 +45,8 @@ app.use(function (req, res, next) {
   app.locals.viewingCategory = req.query.category;
   next();
 });
+
+app.use(express.urlencoded({ extended: true }));
 
 app.engine(
   ".hbs",
@@ -72,6 +78,12 @@ app.engine(
       safeHTML: function (context) {
         return stripJs(context);
       },
+      formatDate: function (dateObj) {
+        let year = dateObj.getFullYear();
+        let month = (dateObj.getMonth() + 1).toString();
+        let day = dateObj.getDate().toString();
+        return `${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+      },
     },
   })
 );
@@ -86,9 +98,7 @@ cloudinary.config({
 
 const upload = multer();
 
-// Configuring the port
 const HTTP_PORT = process.env.PORT || 8080;
-
 app.get("/", (req, res) => {
   res.redirect("/blog");
 });
@@ -125,14 +135,24 @@ app.get("/blog", async (req, res) => {
     viewData.categoriesMessage = "no results";
   }
 
-  res.render("blog", { data: viewData });
+  if (viewData.posts.length > 0) {
+    res.render("blog", { data: viewData });
+  } else {
+    res.render("blog", {
+      data: viewData,
+      message: "Please try another post / category",
+    });
+  }
 });
 
 app.get("/posts", (req, res) => {
+  console.log(req.query.category);
   if (req.query.category) {
-    getPostsByCategory(req.query.category)
+    getPublishedPostsByCategory(req.query.category)
       .then((data) => {
-        res.render("posts", { posts: data });
+        data.length > 0
+          ? res.render("posts", { posts: data })
+          : res.render("posts", { message: "No Results" });
       })
 
       .catch((err) => {
@@ -141,7 +161,9 @@ app.get("/posts", (req, res) => {
   } else if (req.query.minDate) {
     getPostsByMinDate(req.query.minDate)
       .then((data) => {
-        res.render("posts", { posts: data });
+        data.length > 0
+          ? res.render("posts", { posts: data })
+          : res.render("posts", { message: "No Results" });
       })
 
       .catch((err) => {
@@ -150,7 +172,9 @@ app.get("/posts", (req, res) => {
   } else {
     getAllPosts()
       .then((data) => {
-        res.render("posts", { posts: data });
+        data.length > 0
+          ? res.render("posts", { posts: data })
+          : res.render("posts", { message: "No Results" });
       })
 
       .catch((err) => {
@@ -160,7 +184,13 @@ app.get("/posts", (req, res) => {
 });
 
 app.get("/posts/add", (req, res) => {
-  res.render("addPost");
+  getCategories()
+    .then((categories) => {
+      res.render("addPost", { categories: categories });
+    })
+    .catch(() => {
+      res.render("addPost", { categories: [] });
+    });
 });
 
 app.post("/posts/add", upload.single("featureImage"), (req, res) => {
@@ -196,9 +226,10 @@ app.post("/posts/add", upload.single("featureImage"), (req, res) => {
       postObject.published = req.body.published;
 
       if (postObject.title) {
-        addPost(postObject);
+        addPost(postObject).then(() => {
+          res.redirect("/posts");
+        });
       }
-      res.redirect("/posts");
     })
 
     .catch((err) => {
@@ -220,11 +251,53 @@ app.get("/post/:value", (req, res) => {
 app.get("/categories", (req, res) => {
   getCategories()
     .then((data) => {
-      res.render("categories", { categories: data });
+      data.length > 0
+        ? res.render("categories", { categories: data })
+        : res.render("categories", { message: "No Results" });
     })
 
-    .catch((err) => {
+    .catch(() => {
       res.render("categories", { message: "no results" });
+    });
+});
+
+app.get("/categories/add", (req, res) => {
+  res.render("addCategory");
+});
+
+app.post("/categories/add", (req, res) => {
+  let catObject = {};
+
+  catObject.category = req.body.category;
+  console.log(req.body.category);
+  if (req.body.category != "") {
+    addCategory(catObject)
+      .then(() => {
+        res.redirect("/categories");
+      })
+      .catch(() => {
+        console.log("Some error occured");
+      });
+  }
+});
+
+app.get("/categories/delete/:id", (req, res) => {
+  deleteCategoryById(req.params.id)
+    .then(() => {
+      res.redirect("/categories");
+    })
+    .catch(() => {
+      console.log("Unable to remove category / Category not found");
+    });
+});
+
+app.get("/posts/delete/:id", (req, res) => {
+  deletePostById(req.params.id)
+    .then(() => {
+      res.redirect("/posts");
+    })
+    .catch(() => {
+      console.log("Unable to remove category / Category not found");
     });
 });
 
