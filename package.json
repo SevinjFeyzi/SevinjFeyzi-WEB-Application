@@ -24,5 +24,6 @@
     "type": "git",
     "url": "URL"
   },
-  "description": ""
+  "description": "",
+  "devDependencies": {}
 }
