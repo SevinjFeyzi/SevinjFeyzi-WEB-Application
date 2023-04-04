@@ -4,19 +4,21 @@
 * 
 *  Name: Sevinj Feyziyeva 
 Student ID: 154057194 
-Date: Mar-21-23
+Date: Apr-04-23
 *
 *  Online (Cyclic) Link: https://wild-slippers-yak.cyclic.app/categories
 *
 ********************************************************************************/
 const express = require("express");
 const multer = require("multer");
+const authData = require("./auth-service.js");
 const cloudinary = require("cloudinary").v2;
 const streamifier = require("streamifier");
 const exphbs = require("express-handlebars");
 const path = require("path");
 const stripJs = require("strip-js");
 const blogData = require("./blog-service.js");
+const clientSessions = require("client-sessions");
 const {
   initialize,
   getAllPosts,
@@ -30,10 +32,33 @@ const {
   deleteCategoryById,
 } = require("./blog-service.js");
 const { resolve } = require("path");
+const { redirect } = require("express/lib/response.js");
 
 const app = express();
 
 app.use(express.static("public"));
+
+app.use(
+  clientSessions({
+    cookieName: "session",
+    secret: "web322_week8",
+    duration: 2 * 60 * 1000,
+    activeDuration: 1000 * 60,
+  })
+);
+
+app.use(function (req, res, next) {
+  res.locals.session = req.session;
+  next();
+});
+
+function ensureLogin(req, res, next) {
+  if (!req.session.user) {
+    res.redirect("/login");
+  } else {
+    next();
+  }
+}
 
 app.use(function (req, res, next) {
   let route = req.path.substring(1);
@@ -52,7 +77,6 @@ app.engine(
   ".hbs",
   exphbs.engine({
     extname: ".hbs",
-
     helpers: {
       navLink: function (url, options) {
         return (
@@ -334,12 +358,66 @@ app.get("/blog/:id", async (req, res) => {
   res.render("blog", { data: viewData });
 });
 
+app.get("/login", (req, res) => {
+  res.render("login");
+});
+
+app.get("/register", (req, res) => {
+  res.render("register");
+});
+
+app.post("/login", (req, res) => {
+  req.body.userAgent = req.get("User-Agent");
+  authData
+    .checkUser(req.body)
+    .then((user) => {
+      req.session.user = {
+        userName: user.userName,
+        email: user.email,
+        loginHistory: user.loginHistory,
+      };
+      res.redirect("/posts");
+    })
+    .catch((err) => {
+      res.render("login", { errorMessage: err, userName: req.body.userName });
+    });
+});
+
+app.post("/register", (req, res) => {
+  authData
+    .registerUser(req.body)
+    .then(() => {
+      res.render("register", { successMessage: "User created" });
+    })
+    .catch((err) => {
+      res.render("register", {
+        errorMessage: err,
+        userName: req.body.userName,
+      });
+    });
+});
+
+app.get("/logout", (req, res) => {
+  req.session.reset();
+  res.redirect("/");
+});
+
+app.get("/userHistory", ensureLogin, (req, res) => {
+  res.render("userHistory");
+});
+
 app.use((req, res) => {
   res.status(404).render("404");
 });
 
-initialize().then(() => {
-  app.listen(HTTP_PORT, () => {
-    console.log("Express http server listening on: " + HTTP_PORT);
+blogData
+  .initialize()
+  .then(authData.initialize)
+  .then(() => {
+    app.listen(HTTP_PORT, function () {
+      console.log("app listening on: " + HTTP_PORT);
+    });
+  })
+  .catch((err) => {
+    console.log("unable to start server: " + err);
   });
-});
