@@ -105,8 +105,4 @@ function checkUser(userData) {
       });
   });
 }
-module.exports = {
-  initialize,
-  registerUser,
-  checkUser,
-};
+module.exports = { initialize, registerUser, checkUser };
